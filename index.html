@@ -83,6 +83,9 @@
   <button id="install-btn" style="display:none; width:100%; margin-bottom:16px; padding:12px 0; background:#3D6B4F; color:#fff; border:none; font-weight:700; font-size:14px;">
     ⬇ Instalar app
   </button>
+  <button id="toggle-config-btn" style="display:block; margin:0 0 16px; padding:0; background:none; border:none; color:#8A8579; font-size:12px; text-decoration:underline;">
+    ⚙️ Cambiar URL del proxy
+  </button>
 
   <div id="key-setup">
     <b>Configuración necesaria:</b> esta app usa un endpoint compatible con OpenAI/Groq para analizar las fotos (el mismo patrón que tu Cloudflare Worker de Natílev IA). Pegá abajo la URL de tu worker/proxy.
@@ -148,6 +151,11 @@ document.getElementById('save-proxy').onclick = () => {
   proxyUrl = proxyInput.value.trim();
   localStorage.setItem('cal_proxy_url', proxyUrl);
   if (proxyUrl) keySetup.style.display = 'none';
+};
+
+document.getElementById('toggle-config-btn').onclick = () => {
+  proxyInput.value = proxyUrl;
+  keySetup.style.display = keySetup.style.display === 'none' ? 'block' : 'none';
 };
 
 function render() {
