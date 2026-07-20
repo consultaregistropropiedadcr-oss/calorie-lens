@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Contador de calorías por foto</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<meta name="theme-color" content="#1A1A1A" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    background: #FDFCF9;
+    color: #1A1A1A;
+    margin: 0;
+    padding: 24px 16px 60px;
+  }
+  .wrap { max-width: 420px; margin: 0 auto; }
+  .eyebrow {
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #8A8579; font-weight: 700; margin: 0;
+  }
+  h1 {
+    font-family: 'Arial Narrow', 'Helvetica Neue Condensed', sans-serif;
+    font-weight: 900; font-size: 30px; margin: 2px 0 20px; text-transform: capitalize;
+  }
+  .panel { background: #fff; border: 1px solid #1A1A1A; padding: 14px 16px 16px; margin-bottom: 20px; }
+  .panel-title {
+    font-family: 'Arial Narrow', sans-serif; font-weight: 900; font-size: 26px;
+    border-bottom: 8px solid #1A1A1A; padding-bottom: 6px;
+  }
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #1A1A1A; font-size: 14px; }
+  .row.big { padding: 10px 0 8px; border-bottom: 5px solid #1A1A1A; }
+  .big-num { font-family: 'Arial Narrow', sans-serif; font-weight: 900; font-size: 34px; }
+  .rem { font-weight: 700; }
+  .bar { height: 8px; background: #EEEBE3; margin: 10px 0 12px; }
+  .bar-fill { height: 100%; background: #1A1A1A; transition: width .3s ease; }
+  .macro-row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; }
+  .macro-row b { font-weight: 700; }
+  button { font-family: inherit; cursor: pointer; }
+  .photo-btns { display: flex; gap: 10px; }
+  #capture-btn, #gallery-btn {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 14px 0; background: #1A1A1A; color: #FDFCF9; border: none; font-weight: 700; font-size: 14px;
+  }
+  #gallery-btn { background: #fff; color: #1A1A1A; border: 1px solid #1A1A1A; }
+  #capture-btn:disabled, #gallery-btn:disabled { opacity: .6; }
+  #file-input, #gallery-input { display: none; }
+  .error { color: #C1442E; font-size: 13px; margin: 12px 0 0; }
+  .preview { text-align: center; margin: 16px 0; }
+  .preview img { max-width: 160px; border: 1px solid #1A1A1A; opacity: .6; }
+  .entry {
+    display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid #EEEBE3;
+  }
+  .entry img { width: 48px; height: 48px; object-fit: cover; border: 1px solid #1A1A1A; }
+  .entry-info { flex: 1; min-width: 0; }
+  .entry-info p { margin: 0; }
+  .entry-name { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .entry-meta { font-size: 12px; color: #8A8579; }
+  .entry-cal { font-weight: 900; font-size: 15px; display: flex; align-items: center; gap: 4px; color: #C1442E; }
+  .entry-del { border: none; background: none; color: #8A8579; font-size: 16px; margin-left: 4px; }
+  .goal-edit { display: flex; gap: 6px; align-items: center; }
+  .goal-edit input { width: 70px; font-size: 14px; padding: 2px 4px; border: 1px solid #1A1A1A; }
+  .goal-edit button { border: none; background: none; font-size: 15px; }
+  .pencil { border: none; background: none; color: #8A8579; font-size: 12px; margin-left: 4px; }
+  .footnote { font-size: 11px; color: #8A8579; margin-top: 24px; line-height: 1.5; }
+  .empty { font-size: 14px; color: #8A8579; }
+  .spin { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+  #key-setup { background: #fff; border: 1px solid #1A1A1A; padding: 14px 16px; margin-bottom: 20px; font-size: 13px; line-height: 1.6; }
+  #key-setup input { width: 100%; padding: 8px; border: 1px solid #1A1A1A; font-size: 13px; margin-top: 8px; }
+  #key-setup button { margin-top: 8px; padding: 8px 14px; background: #1A1A1A; color: #fff; border: none; font-size: 13px; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">Contador de calorías por foto</p>
+  <h1 id="date-label"></h1>
+  <button id="install-btn" style="display:none; width:100%; margin-bottom:16px; padding:12px 0; background:#3D6B4F; color:#fff; border:none; font-weight:700; font-size:14px;">
+    ⬇ Instalar app
+  </button>
+
+  <div id="key-setup">
+    <b>Configuración necesaria:</b> esta app usa un endpoint compatible con OpenAI/Groq para analizar las fotos (el mismo patrón que tu Cloudflare Worker de Natílev IA). Pegá abajo la URL de tu worker/proxy.
+    <input id="proxy-url" type="text" placeholder="https://tu-worker.tu-usuario.workers.dev" />
+    <button id="save-proxy">Guardar</button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Datos de tu día</div>
+    <div class="row big">
+      <span style="font-weight:700">Calorías consumidas</span>
+      <span class="big-num" id="cal-total">0</span>
+    </div>
+    <div class="row">
+      <span>Meta diaria <button class="pencil" id="edit-goal">✎</button></span>
+      <span id="goal-display">2000 kcal</span>
+      <span class="goal-edit" id="goal-edit" style="display:none">
+        <input id="goal-input" type="number" value="2000" />
+        <button id="save-goal" style="color:#3D6B4F">✓</button>
+        <button id="cancel-goal" style="color:#C1442E">✕</button>
+      </span>
+    </div>
+    <div class="row">
+      <span id="rem-label">Restante</span>
+      <span class="rem" id="rem-value">2000 kcal</span>
+    </div>
+    <div class="bar"><div class="bar-fill" id="bar-fill" style="width:0%"></div></div>
+    <div class="macro-row"><span>Proteína</span><b id="protein-total">0 g</b></div>
+    <div class="macro-row"><span>Carbohidratos</span><b id="carbs-total">0 g</b></div>
+    <div class="macro-row" style="border-top:1px solid #1A1A1A;padding-top:8px"><span>Grasa</span><b id="fat-total">0 g</b></div>
+  </div>
+
+  <div class="photo-btns">
+    <button id="capture-btn">📷 Tomar foto</button>
+    <button id="gallery-btn">🖼️ Galería</button>
+  </div>
+  <input id="file-input" type="file" accept="image/*" capture="environment" />
+  <input id="gallery-input" type="file" accept="image/*" />
+  <p class="error" id="error-msg" style="display:none"></p>
+  <div class="preview" id="preview" style="display:none"><img id="preview-img" /></div>
+
+  <p class="eyebrow" style="margin-top:24px">Registro de hoy</p>
+  <div id="entries"></div>
+  <p class="empty" id="empty-msg">Todavía no registrás comida. Tomá una foto de tu plato para empezar.</p>
+
+  <p class="footnote">Las calorías son estimaciones de una IA basadas en la foto y pueden variar del valor real. Los datos se guardan en este dispositivo (localStorage).</p>
+</div>
+
+<script>
+let entries = JSON.parse(localStorage.getItem('cal_entries') || '[]');
+let goal = parseInt(localStorage.getItem('cal_goal') || '2000', 10);
+let proxyUrl = localStorage.getItem('cal_proxy_url') || '';
+
+const dateLabel = document.getElementById('date-label');
+dateLabel.textContent = new Date().toLocaleDateString('es-CR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+const proxyInput = document.getElementById('proxy-url');
+const keySetup = document.getElementById('key-setup');
+proxyInput.value = proxyUrl;
+if (proxyUrl) keySetup.style.display = 'none';
+
+document.getElementById('save-proxy').onclick = () => {
+  proxyUrl = proxyInput.value.trim();
+  localStorage.setItem('cal_proxy_url', proxyUrl);
+  if (proxyUrl) keySetup.style.display = 'none';
+};
+
+function render() {
+  const totals = entries.reduce((a, e) => ({
+    cal: a.cal + e.calories, protein: a.protein + e.protein, carbs: a.carbs + e.carbs, fat: a.fat + e.fat
+  }), { cal: 0, protein: 0, carbs: 0, fat: 0 });
+
+  const remaining = goal - totals.cal;
+  const overGoal = remaining < 0;
+  const pct = Math.min(100, Math.round((totals.cal / goal) * 100));
+
+  document.getElementById('cal-total').textContent = totals.cal;
+  document.getElementById('goal-display').textContent = goal + ' kcal';
+  document.getElementById('rem-label').textContent = overGoal ? 'Exceso' : 'Restante';
+  document.getElementById('rem-value').textContent = (overGoal ? '+' + Math.abs(remaining) : remaining) + ' kcal';
+  document.getElementById('rem-value').style.color = overGoal ? '#C1442E' : '#3D6B4F';
+  document.getElementById('bar-fill').style.width = pct + '%';
+  document.getElementById('bar-fill').style.background = overGoal ? '#C1442E' : '#1A1A1A';
+  document.getElementById('protein-total').textContent = totals.protein + ' g';
+  document.getElementById('carbs-total').textContent = totals.carbs + ' g';
+  document.getElementById('fat-total').textContent = totals.fat + ' g';
+
+  const container = document.getElementById('entries');
+  container.innerHTML = '';
+  document.getElementById('empty-msg').style.display = entries.length ? 'none' : 'block';
+
+  entries.forEach(e => {
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.innerHTML = `
+      <img src="${e.image}" alt="${e.name}" />
+      <div class="entry-info">
+        <p class="entry-name">${e.name}</p>
+        <p class="entry-meta">${e.time} · P ${e.protein}g · C ${e.carbs}g · G ${e.fat}g</p>
+      </div>
+      <span class="entry-cal">🔥${e.calories}</span>
+      <button class="entry-del" data-id="${e.id}">🗑</button>
+    `;
+    container.appendChild(div);
+  });
+
+  container.querySelectorAll('.entry-del').forEach(btn => {
+    btn.onclick = () => {
+      entries = entries.filter(e => e.id !== Number(btn.dataset.id));
+      localStorage.setItem('cal_entries', JSON.stringify(entries));
+      render();
+    };
+  });
+}
+
+document.getElementById('edit-goal').onclick = () => {
+  document.getElementById('goal-display').style.display = 'none';
+  document.getElementById('goal-edit').style.display = 'flex';
+  document.getElementById('goal-input').value = goal;
+};
+document.getElementById('save-goal').onclick = () => {
+  const n = parseInt(document.getElementById('goal-input').value, 10);
+  if (!isNaN(n) && n > 0) { goal = n; localStorage.setItem('cal_goal', goal); }
+  document.getElementById('goal-display').style.display = 'inline';
+  document.getElementById('goal-edit').style.display = 'none';
+  render();
+};
+document.getElementById('cancel-goal').onclick = () => {
+  document.getElementById('goal-display').style.display = 'inline';
+  document.getElementById('goal-edit').style.display = 'none';
+};
+
+const fileInput = document.getElementById('file-input');
+const galleryInput = document.getElementById('gallery-input');
+const captureBtn = document.getElementById('capture-btn');
+const galleryBtn = document.getElementById('gallery-btn');
+const errorMsg = document.getElementById('error-msg');
+const preview = document.getElementById('preview');
+const previewImg = document.getElementById('preview-img');
+
+captureBtn.onclick = () => fileInput.click();
+galleryBtn.onclick = () => galleryInput.click();
+
+fileInput.onchange = () => handleFile(fileInput);
+galleryInput.onchange = () => handleFile(galleryInput);
+
+async function handleFile(inputEl) {
+  const file = inputEl.files[0];
+  if (!file) return;
+  if (!proxyUrl) {
+    errorMsg.textContent = 'Configurá primero la URL de tu proxy arriba.';
+    errorMsg.style.display = 'block';
+    return;
+  }
+  errorMsg.style.display = 'none';
+  captureBtn.disabled = true;
+  galleryBtn.disabled = true;
+  captureBtn.textContent = '⏳ Analizando...';
+
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const base64 = reader.result.split(',')[1];
+    previewImg.src = reader.result;
+    preview.style.display = 'block';
+
+    try {
+      // Ajustá este payload al formato que espera tu Worker (Groq/OpenAI vision-compatible).
+      const res = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image_base64: base64,
+          media_type: file.type || 'image/jpeg',
+          prompt: 'Identificá la comida en la foto y estimá calorias totales, proteina_g, carbohidratos_g y grasa_g de la porción visible. Respondé solo JSON: {"nombre":"","calorias":0,"proteina_g":0,"carbohidratos_g":0,"grasa_g":0}'
+        })
+      });
+      const data = await res.json();
+      const raw = (data.text || data.result || data.content || '').toString();
+      const cleaned = raw.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+
+      entries.unshift({
+        id: Date.now(),
+        name: parsed.nombre || 'Comida',
+        calories: Math.round(parsed.calorias || 0),
+        protein: Math.round(parsed.proteina_g || 0),
+        carbs: Math.round(parsed.carbohidratos_g || 0),
+        fat: Math.round(parsed.grasa_g || 0),
+        image: reader.result,
+        time: new Date().toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit' })
+      });
+      localStorage.setItem('cal_entries', JSON.stringify(entries));
+      render();
+    } catch (err) {
+      console.error(err);
+      errorMsg.textContent = 'No se pudo analizar la foto. Revisá tu proxy o intentá con otra imagen.';
+      errorMsg.style.display = 'block';
+    } finally {
+      captureBtn.disabled = false;
+      galleryBtn.disabled = false;
+      captureBtn.textContent = '📷 Tomar foto';
+      preview.style.display = 'none';
+      inputEl.value = '';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+render();
+
+// --- PWA: registro del service worker + botón de instalación ---
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch((err) => console.error('SW error:', err));
+  });
+}
+
+let deferredPrompt;
+const installBtn = document.getElementById('install-btn');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  if (installBtn) installBtn.style.display = 'block';
+});
+
+if (installBtn) {
+  installBtn.onclick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    installBtn.style.display = 'none';
+  };
+}
+
+window.addEventListener('appinstalled', () => {
+  if (installBtn) installBtn.style.display = 'none';
+});
+</script>
+</body>
+</html>
