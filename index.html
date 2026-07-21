@@ -86,9 +86,21 @@
   <button id="toggle-config-btn" style="display:block; margin:0 0 8px; padding:0; background:none; border:none; color:#8A8579; font-size:12px; text-decoration:underline;">
     ⚙️ Cambiar URL del proxy
   </button>
-  <button id="toggle-profile-btn" style="display:block; margin:0 0 16px; padding:0; background:none; border:none; color:#8A8579; font-size:12px; text-decoration:underline;">
+  <button id="toggle-profile-btn" style="display:block; margin:0 0 8px; padding:0; background:none; border:none; color:#8A8579; font-size:12px; text-decoration:underline;">
     👤 Mi perfil y meta calórica
   </button>
+  <button id="toggle-history-btn" style="display:block; margin:0 0 16px; padding:0; background:none; border:none; color:#8A8579; font-size:12px; text-decoration:underline;">
+    📊 Historial de días anteriores
+  </button>
+
+  <div id="history-panel" style="display:none; background:#fff; border:1px solid #1A1A1A; padding:14px 16px; margin-bottom:20px; font-size:13px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <p style="margin:0; font-weight:700;">Historial por día</p>
+      <button id="clear-history-btn" style="border:1px solid #C1442E; background:none; color:#C1442E; font-size:11px; padding:4px 8px; font-weight:700;">🗑 Borrar historial</button>
+    </div>
+    <div id="history-list"></div>
+    <p id="history-empty" style="color:#8A8579; margin:6px 0 0;">Todavía no hay días registrados en el historial.</p>
+  </div>
 
   <div id="profile-setup" style="display:none; background:#fff; border:1px solid #1A1A1A; padding:14px 16px; margin-bottom:20px; font-size:13px;">
     <p style="margin:0 0 10px; font-weight:700;">Calculá tu meta diaria según tus datos</p>
@@ -172,6 +184,43 @@
 </div>
 
 <script>
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// --- Reinicio diario: archiva el día anterior en el historial y limpia entradas + imágenes ---
+function runDailyReset() {
+  const today = todayKey();
+  const lastDate = localStorage.getItem('cal_current_date');
+
+  if (lastDate && lastDate !== today) {
+    const prevEntries = JSON.parse(localStorage.getItem('cal_entries') || '[]');
+    if (prevEntries.length > 0) {
+      const totals = prevEntries.reduce((a, e) => ({
+        cal: a.cal + e.calories, protein: a.protein + e.protein, carbs: a.carbs + e.carbs, fat: a.fat + e.fat
+      }), { cal: 0, protein: 0, carbs: 0, fat: 0 });
+
+      const history = JSON.parse(localStorage.getItem('cal_history') || '[]');
+      history.unshift({
+        date: lastDate,
+        calories: totals.cal,
+        protein: totals.protein,
+        carbs: totals.carbs,
+        fat: totals.fat,
+        goal: parseInt(localStorage.getItem('cal_goal') || '2000', 10),
+        items: prevEntries.length
+      });
+      localStorage.setItem('cal_history', JSON.stringify(history));
+    }
+    // Limpia las entradas del día anterior y sus imágenes (las imágenes viven dentro de cal_entries)
+    localStorage.removeItem('cal_entries');
+  }
+
+  localStorage.setItem('cal_current_date', today);
+}
+runDailyReset();
+
 let entries = JSON.parse(localStorage.getItem('cal_entries') || '[]');
 let goal = parseInt(localStorage.getItem('cal_goal') || '2000', 10);
 let proxyUrl = localStorage.getItem('cal_proxy_url') || '';
@@ -256,6 +305,43 @@ document.getElementById('calc-goal-btn').onclick = () => {
   render();
 };
 
+// --- Historial por día ---
+const historyPanel = document.getElementById('history-panel');
+const toggleHistoryBtn = document.getElementById('toggle-history-btn');
+const historyList = document.getElementById('history-list');
+const historyEmpty = document.getElementById('history-empty');
+
+function renderHistory() {
+  const history = JSON.parse(localStorage.getItem('cal_history') || '[]');
+  historyList.innerHTML = '';
+  historyEmpty.style.display = history.length ? 'none' : 'block';
+
+  history.forEach(h => {
+    const over = h.calories > h.goal;
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #EEEBE3;';
+    div.innerHTML = `
+      <div>
+        <p style="margin:0; font-weight:700; font-size:13px;">${h.date}</p>
+        <p style="margin:0; font-size:11px; color:#8A8579;">${h.items} comida(s) · Meta ${h.goal} kcal</p>
+      </div>
+      <span style="font-weight:900; font-size:15px; color:${over ? '#C1442E' : '#3D6B4F'};">${h.calories} kcal</span>
+    `;
+    historyList.appendChild(div);
+  });
+}
+
+toggleHistoryBtn.onclick = () => {
+  renderHistory();
+  historyPanel.style.display = historyPanel.style.display === 'none' ? 'block' : 'none';
+};
+
+document.getElementById('clear-history-btn').onclick = () => {
+  if (confirm('¿Borrar todo el historial de días anteriores? Esta acción no se puede deshacer.')) {
+    localStorage.removeItem('cal_history');
+    renderHistory();
+  }
+};
 
 function render() {
   const totals = entries.reduce((a, e) => ({
